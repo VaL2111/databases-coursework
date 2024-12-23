@@ -11,7 +11,7 @@ export default hopeTheme({
 
   editLink: false,
   // Замінити на назву свого репозиторія
-  repo: "bohdanbulakh/databases-labs",
+  repo: "VaL2111/databases-coursework",
 
   docsDir: "docs",
   // navbar
