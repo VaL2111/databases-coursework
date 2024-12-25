@@ -21,7 +21,7 @@ export default hopeTheme({
   sidebar,
 
   // Підставити рік та Ваше імʼя
-  footer: "ECL 2.0 Licensed | Copyright © 2024 Bohdan Bulakh ",
+  footer: "ECL 2.0 Licensed | Copyright © 2024 Valentyn Bahmatskyi ",
 
   displayFooter: true,
 

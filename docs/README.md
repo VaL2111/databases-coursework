@@ -5,7 +5,7 @@ title: Початок
 
 heroText: "Система управління проєктами"
 
-tagline: Лабораторні роботи з дисципліни "Організація баз данних"
+tagline: Курсова робота з дисципліни "Організація баз данних"
 
 actions:
   - text: Розпочати
@@ -13,7 +13,7 @@ actions:
     link: ./intro/
     type: primary
 
-footer: "ECL 2.0 Licensed | Copyright © 2024 Bohdan Bulakh |"
+footer: "ECL 2.0 Licensed | Copyright © 2024 Valentyn Bahmatskyi |"
 
 ---
 
@@ -21,6 +21,7 @@ footer: "ECL 2.0 Licensed | Copyright © 2024 Bohdan Bulakh |"
 **Виконав:**
 
 *студент 2-го курсу, групи ІМ-31*<span padding-right:5em></span> **Валентин БАХМАЦЬКИЙ** [Telegram](https://t.me/val_entin11)
+
 
 **Керівник**
 
