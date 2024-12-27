@@ -1,0 +1,160 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model Project {
+  id                       String                    @id @default(uuid())
+  status                   String                    @db.VarChar(255)
+  name                     String                    @db.VarChar(255)
+  description              String                    @db.MediumText
+  connectToProjectRequests ConnectToProjectRequest[]
+  projectMembers           ProjectMember[]
+  roles                    Role[]
+  tasks                    Task[]
+
+  @@map("project")
+}
+
+model ProjectMember {
+  id                 String              @id @default(uuid())
+  projectId          String              @map("project_id")
+  userId             String              @map("user_id")
+  assignments        Assignment[]
+  project            Project             @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user               User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  projectMemberRoles ProjectMemberRole[]
+  taskComments       TaskComment[]
+
+  @@index([projectId], map: "project_member_project_id_fkey")
+  @@index([userId], map: "project_member_user_id_fkey")
+  @@map("project_member")
+}
+
+model Task {
+  id           String        @id @default(uuid())
+  name         String        @db.VarChar(255)
+  description  String        @db.MediumText
+  status       String        @db.VarChar(255)
+  deadline     DateTime?     @db.DateTime(0)
+  projectId    String        @map("project_id")
+  assignments  Assignment[]
+  project      Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  taskComments TaskComment[]
+
+  @@index([projectId], map: "task_project_id_fkey")
+  @@map("task")
+}
+
+model TaskComment {
+  id              String        @id @default(uuid())
+  text            String        @db.MediumText
+  taskId          String        @map("task_id")
+  projectMemberId String        @map("project_member_id")
+  projectMember   ProjectMember @relation(fields: [projectMemberId], references: [id], onDelete: Cascade)
+  task            Task          @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@index([projectMemberId], map: "task_comment_project_member_id_fkey")
+  @@index([taskId], map: "task_comment_task_id_fkey")
+  @@map("task_comment")
+}
+
+model User {
+  id                       String                    @id @default(uuid())
+  username                 String                    @db.VarChar(255)
+  password                 String                    @db.VarChar(255)
+  email                    String                    @db.VarChar(320)
+  firstName                String                    @map("first_name") @db.VarChar(255)
+  lastName                 String                    @map("last_name") @db.VarChar(255)
+  avatar                   String?                   @db.MediumText
+  blocked                  Boolean                   @default(dbgenerated("b'0'")) @db.Bit(1)
+  connectToProjectRequests ConnectToProjectRequest[]
+  projectMembers           ProjectMember[]
+  supportRequests          SupportRequest[]
+
+  @@map("user")
+}
+
+model Assignment {
+  id              String        @id @default(uuid())
+  taskId          String        @map("task_id")
+  projectMemberId String        @map("project_member_id")
+  projectMember   ProjectMember @relation(fields: [projectMemberId], references: [id], onDelete: Cascade)
+  task            Task          @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@index([projectMemberId], map: "assignment_project_member_id_fkey")
+  @@index([taskId], map: "assignment_task_id_fkey")
+  @@map("assignment")
+}
+
+model SupportRequest {
+  id                     String                 @id @default(uuid())
+  userId                 String                 @map("user_id")
+  topic                  String                 @db.VarChar(255)
+  description            String                 @db.MediumText
+  user                   User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  supportRequestsAnswers SupportRequestAnswer[]
+
+  @@index([userId], map: "suport_request_user_id_fkey")
+  @@map("suport_request")
+}
+
+model SupportRequestAnswer {
+  id               String         @id @default(uuid())
+  feedback         String         @db.MediumText
+  supportRequestId String         @map("support_request_id")
+  supportRequest   SupportRequest @relation(fields: [supportRequestId], references: [id], onDelete: Cascade)
+
+  @@index([supportRequestId], map: "support_request_answer_support_request_id_fkey")
+  @@map("support_request_answer")
+}
+
+model ConnectToProjectRequest {
+  id        String  @id @default(uuid())
+  userId    String  @map("user_id")
+  projectId String  @map("project_id")
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user      User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([projectId], map: "connect_to_project_request_project_id_fkey")
+  @@index([userId], map: "connect_to_project_request_user_id_fkey")
+  @@map("connect_to_project_request")
+}
+
+model Role {
+  id                 String              @id @default(uuid())
+  name               String              @db.VarChar(255)
+  projectId          String              @map("project_id")
+  grants             Grant[]
+  projectMemberRoles ProjectMemberRole[]
+  project            Project             @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId], map: "role_project_id_fkey")
+  @@map("role")
+}
+
+model ProjectMemberRole {
+  id              String        @id @default(uuid())
+  roleId          String        @map("role_id")
+  projectMemberId String        @map("project_member_id")
+  projectMember   ProjectMember @relation(fields: [projectMemberId], references: [id], onDelete: Cascade)
+  role            Role          @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@index([projectMemberId], map: "project_member_role_project_member_id_fkey")
+  @@index([roleId], map: "project_member_role_role_id_fkey")
+  @@map("project_member_role")
+}
+
+model Grant {
+  id         String @id @default(uuid())
+  permission String @db.VarChar(255)
+  roleId     String @map("role_id")
+  role       Role   @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@index([roleId], map: "grant_role_id_fkey")
+  @@map("grant")
+}
