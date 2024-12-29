@@ -298,3 +298,675 @@ COMMIT;
 ```
 
 ## RESTfull сервіс для управління даними
+
+### Схема бази даних Prisma ORM
+
+```prisma
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model Project {
+  id                       String                    @id @default(uuid())
+  status                   String                    @db.VarChar(255)
+  name                     String                    @db.VarChar(255)
+  description              String                    @db.MediumText
+  connectToProjectRequests ConnectToProjectRequest[]
+  projectMembers           ProjectMember[]
+  roles                    Role[]
+  tasks                    Task[]
+
+  @@map("project")
+}
+
+model ProjectMember {
+  id                 String              @id @default(uuid())
+  projectId          String              @map("project_id")
+  userId             String              @map("user_id")
+  assignments        Assignment[]
+  project            Project             @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user               User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  projectMemberRoles ProjectMemberRole[]
+  taskComments       TaskComment[]
+
+  @@index([projectId], map: "project_member_project_id_fkey")
+  @@index([userId], map: "project_member_user_id_fkey")
+  @@map("project_member")
+}
+
+model Task {
+  id           String        @id @default(uuid())
+  name         String        @db.VarChar(255)
+  description  String        @db.MediumText
+  status       String        @db.VarChar(255)
+  deadline     DateTime?     @db.DateTime(0)
+  projectId    String        @map("project_id")
+  assignments  Assignment[]
+  project      Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  taskComments TaskComment[]
+
+  @@index([projectId], map: "task_project_id_fkey")
+  @@map("task")
+}
+
+model TaskComment {
+  id              String        @id @default(uuid())
+  text            String        @db.MediumText
+  taskId          String        @map("task_id")
+  projectMemberId String        @map("project_member_id")
+  projectMember   ProjectMember @relation(fields: [projectMemberId], references: [id], onDelete: Cascade)
+  task            Task          @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@index([projectMemberId], map: "task_comment_project_member_id_fkey")
+  @@index([taskId], map: "task_comment_task_id_fkey")
+  @@map("task_comment")
+}
+
+model User {
+  id                       String                    @id @default(uuid())
+  username                 String                    @db.VarChar(255)
+  password                 String                    @db.VarChar(255)
+  email                    String                    @db.VarChar(320)
+  firstName                String                    @map("first_name") @db.VarChar(255)
+  lastName                 String                    @map("last_name") @db.VarChar(255)
+  avatar                   String?                   @db.MediumText
+  blocked                  Boolean                   @default(dbgenerated("b'0'")) @db.Bit(1)
+  connectToProjectRequests ConnectToProjectRequest[]
+  projectMembers           ProjectMember[]
+  supportRequests          SupportRequest[]
+
+  @@map("user")
+}
+
+model Assignment {
+  id              String        @id @default(uuid())
+  taskId          String        @map("task_id")
+  projectMemberId String        @map("project_member_id")
+  projectMember   ProjectMember @relation(fields: [projectMemberId], references: [id], onDelete: Cascade)
+  task            Task          @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@index([projectMemberId], map: "assignment_project_member_id_fkey")
+  @@index([taskId], map: "assignment_task_id_fkey")
+  @@map("assignment")
+}
+
+model SupportRequest {
+  id                     String                 @id @default(uuid())
+  userId                 String                 @map("user_id")
+  topic                  String                 @db.VarChar(255)
+  description            String                 @db.MediumText
+  user                   User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  supportRequestsAnswers SupportRequestAnswer[]
+
+  @@index([userId], map: "suport_request_user_id_fkey")
+  @@map("suport_request")
+}
+
+model SupportRequestAnswer {
+  id               String         @id @default(uuid())
+  feedback         String         @db.MediumText
+  supportRequestId String         @map("support_request_id")
+  supportRequest   SupportRequest @relation(fields: [supportRequestId], references: [id], onDelete: Cascade)
+
+  @@index([supportRequestId], map: "support_request_answer_support_request_id_fkey")
+  @@map("support_request_answer")
+}
+
+model ConnectToProjectRequest {
+  id        String  @id @default(uuid())
+  userId    String  @map("user_id")
+  projectId String  @map("project_id")
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user      User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([projectId], map: "connect_to_project_request_project_id_fkey")
+  @@index([userId], map: "connect_to_project_request_user_id_fkey")
+  @@map("connect_to_project_request")
+}
+
+model Role {
+  id                 String              @id @default(uuid())
+  name               String              @db.VarChar(255)
+  projectId          String              @map("project_id")
+  grants             Grant[]
+  projectMemberRoles ProjectMemberRole[]
+  project            Project             @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId], map: "role_project_id_fkey")
+  @@map("role")
+}
+
+model ProjectMemberRole {
+  id              String        @id @default(uuid())
+  roleId          String        @map("role_id")
+  projectMemberId String        @map("project_member_id")
+  projectMember   ProjectMember @relation(fields: [projectMemberId], references: [id], onDelete: Cascade)
+  role            Role          @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@index([projectMemberId], map: "project_member_role_project_member_id_fkey")
+  @@index([roleId], map: "project_member_role_role_id_fkey")
+  @@map("project_member_role")
+}
+
+model Grant {
+  id         String @id @default(uuid())
+  permission String @db.VarChar(255)
+  roleId     String @map("role_id")
+  role       Role   @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@index([roleId], map: "grant_role_id_fkey")
+  @@map("grant")
+}
+```
+### Головний файл програми
+
+```typescript
+import { NestFactory } from '@nestjs/core';
+import { AppModule } from './app.module';
+import * as process from 'node:process';
+import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import { ValidationPipe, VersioningType } from '@nestjs/common';
+
+async function bootstrap() {
+  const port = process.env.PORT ?? 3000;
+
+  const app = await NestFactory.create(AppModule);
+
+  app.useGlobalPipes(
+      new ValidationPipe({
+        transform: true,
+        whitelist: true,
+      }),
+  );
+
+  app.enableVersioning({
+    type: VersioningType.URI,
+    defaultVersion: '1',
+  });
+
+  const swaggerConfig = new DocumentBuilder()
+      .setTitle('Project Management API')
+      .setDescription('API documentation for Project and ConnectToProjectRequest')
+      .setVersion('1')
+      .build();
+
+  const document = SwaggerModule.createDocument(app, swaggerConfig);
+  SwaggerModule.setup('api', app, document);
+
+  await app.listen(port, () => console.info(`Swagger: http://localhost:${port}/api`));
+}
+
+bootstrap();
+```
+
+### Головний модуль програми
+
+```typescript
+import { Module } from '@nestjs/common';
+import { PrismaModule } from './modules/prisma.module';
+import { ProjectModule } from './modules/project.module';
+import { ConnectToProjectRequestModule } from './modules/connect-to-project-request.module';
+
+@Module({
+  imports: [PrismaModule, ProjectModule, ConnectToProjectRequestModule],
+})
+export class AppModule {}
+```
+
+### Підключення до бази даних
+
+#### Сервіс
+```typescript
+import { Injectable, OnModuleInit } from '@nestjs/common';
+import { PrismaClient } from '@prisma/client';
+
+@Injectable()
+export class PrismaService extends PrismaClient implements OnModuleInit {
+    async onModuleInit() {
+        await this.$connect();
+    }
+}
+```
+
+#### Модуль
+```typescript
+import { Global, Module } from '@nestjs/common';
+import { PrismaService } from '../database/prisma.service';
+
+@Global()
+@Module({
+    providers: [PrismaService],
+    exports: [PrismaService],
+})
+export class PrismaModule {}
+```
+
+### Project
+
+#### Контролер
+```typescript
+import { Body, Controller, Delete, Get, Param, Patch, Post } from '@nestjs/common';
+import { ApiBadRequestResponse, ApiOkResponse, ApiOperation, ApiParam, ApiTags } from '@nestjs/swagger';
+import { ProjectService } from '../services/project.service';
+import { CreateProjectDTO } from '../dtos/create-project.dto';
+import { UpdateProjectDTO } from '../dtos/update-project.dto';
+import { ProjectResponse } from '../../responses/project.response';
+
+@ApiTags('Project')
+@Controller('/projects')
+export class ProjectController {
+    constructor(private readonly projectService: ProjectService) {}
+
+    @ApiOperation({
+        summary: 'Get all projects',
+        description: 'Endpoint for getting all projects',
+    })
+    @ApiOkResponse({
+        type: [ProjectResponse],
+    })
+    @Get()
+    getAll() {
+        return this.projectService.getAll();
+    }
+
+    @ApiOperation({
+        summary: 'Get project by id',
+        description: 'Endpoint for getting project by id',
+    })
+    @ApiOkResponse({
+        type: ProjectResponse,
+    })
+    @ApiBadRequestResponse({
+        description: `\n
+    InvalidEntityIdException:
+      Project with such id not found`,
+    })
+    @ApiParam({
+        name: 'id',
+        description: 'Id of the project to get',
+    })
+    @Get('/:id')
+    get(@Param('id') id: string) {
+        return this.projectService.getById(id);
+    }
+
+    @ApiOperation({
+        summary: 'Create a new project',
+        description: 'Endpoint for creating a new project',
+    })
+    @ApiOkResponse({
+        type: ProjectResponse,
+    })
+    @ApiBadRequestResponse({
+        description: `\n
+    InvalidBodyException:
+      Project name cannot be empty
+      Project status cannot be empty`,
+    })
+    @Post()
+    create(@Body() body: CreateProjectDTO) {
+        return this.projectService.create(body);
+    }
+
+    @ApiOperation({
+        summary: 'Update project by id',
+        description: 'Endpoint for updating a project by id',
+    })
+    @ApiOkResponse({
+        type: ProjectResponse,
+    })
+    @ApiBadRequestResponse({
+        description: `\n
+    InvalidEntityIdException:
+      Project with such id not found`,
+    })
+    @ApiParam({
+        name: 'id',
+        description: 'Id of the project to update',
+    })
+    @Patch('/:id')
+    update(@Param('id') id: string, @Body() body: UpdateProjectDTO) {
+        return this.projectService.updateById(id, body);
+    }
+
+    @ApiOperation({
+        summary: 'Delete project by id',
+        description: 'Endpoint for deleting a project by id',
+    })
+    @ApiOkResponse({
+        description: 'Project successfully deleted',
+    })
+    @ApiBadRequestResponse({
+        description: `\n
+    InvalidEntityIdException:
+      Project with such id not found`,
+    })
+    @ApiParam({
+        name: 'id',
+        description: 'Id of the project to delete',
+    })
+    @Delete('/:id')
+    delete(@Param('id') id: string) {
+        return this.projectService.deleteById(id);
+    }
+}
+```
+
+#### Сервіс
+
+```typescript
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { PrismaService } from '../../database/prisma.service';
+import { CreateProjectDTO } from '../dtos/create-project.dto';
+import { UpdateProjectDTO } from '../dtos/update-project.dto';
+
+@Injectable()
+export class ProjectService {
+    constructor(private readonly prisma: PrismaService) {}
+
+    // Отримати всі проекти
+    getAll() {
+        return this.prisma.project.findMany();
+    }
+
+    // Отримати проект за ID
+    async getById(id: string) {
+        const project = await this.prisma.project.findUnique({ where: { id } });
+        if (!project) {
+            throw new NotFoundException(`Project with ID ${id} does not exist`);
+        }
+        return project;
+    }
+
+    // Створити новий проект
+    async create(data: CreateProjectDTO) {
+        try {
+            return await this.prisma.project.create({ data });
+        } catch (error) {
+            throw new BadRequestException('Error creating the project. Please check the data.');
+        }
+    }
+
+    // Оновити проект за ID
+    async updateById(id: string, data: UpdateProjectDTO) {
+        const project = await this.prisma.project.findUnique({ where: { id } });
+        if (!project) {
+            throw new NotFoundException(`Project with ID ${id} does not exist`);
+        }
+
+        return this.prisma.project.update({ where: { id }, data });
+    }
+
+    // Видалити проект за ID
+    async deleteById(id: string) {
+        const project = await this.prisma.project.findUnique({ where: { id } });
+        if (!project) {
+            throw new NotFoundException(`Project with ID ${id} does not exist`);
+        }
+
+        return this.prisma.project.delete({ where: { id } });
+    }
+}
+```
+
+#### DTO для створення
+
+```typescript
+import { IsNotEmpty, IsString, MaxLength, MinLength } from 'class-validator';
+import { ApiProperty } from '@nestjs/swagger';
+import { validationOptionsMsg } from '../../utils';
+
+export class CreateProjectDTO {
+    @ApiProperty({
+        description: 'Name of the project',
+    })
+    @IsNotEmpty(validationOptionsMsg('Project name cannot be empty'))
+    @IsString(validationOptionsMsg('Project name must be a string'))
+    @MinLength(3, validationOptionsMsg('Project name is too short (min: 3)'))
+    @MaxLength(50, validationOptionsMsg('Project name is too long (max: 50)'))
+    name: string;
+
+    @ApiProperty({
+        description: 'Description of the project',
+    })
+    @IsNotEmpty(validationOptionsMsg('Description cannot be empty'))
+    @IsString(validationOptionsMsg('Description must be a string'))
+    description: string;
+
+    @ApiProperty({
+        description: 'Status of the project',
+    })
+    @IsNotEmpty(validationOptionsMsg('Status cannot be empty'))
+    @IsString(validationOptionsMsg('Status must be a string'))
+    status: string;
+}
+```
+
+#### DTO для оновлення
+
+```typescript
+import { IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
+import { ApiPropertyOptional } from '@nestjs/swagger';
+import { validationOptionsMsg } from '../../utils';
+
+export class UpdateProjectDTO {
+    @ApiPropertyOptional({
+        description: 'Name of the project',
+    })
+    @IsOptional()
+    @IsString(validationOptionsMsg('Project name must be a string'))
+    @MinLength(3, validationOptionsMsg('Project name is too short (min: 3)'))
+    @MaxLength(50, validationOptionsMsg('Project name is too long (max: 50)'))
+    name?: string;
+
+    @ApiPropertyOptional({
+        description: 'Description of the project',
+    })
+    @IsOptional()
+    @IsString(validationOptionsMsg('Description must be a string'))
+    description?: string;
+
+    @ApiPropertyOptional({
+        description: 'Status of the project',
+    })
+    @IsOptional()
+    @IsString(validationOptionsMsg('Status must be a string'))
+    status?: string;
+}
+```
+
+#### Модуль
+
+```typescript
+import { Module } from '@nestjs/common';
+import { ProjectController } from '../api/controllers/project.controller';
+import { ProjectService } from '../api/services/project.service';
+
+@Module({
+    controllers: [ProjectController],
+    providers: [ProjectService],
+})
+export class ProjectModule {}
+```
+
+### Connect to project request
+
+#### Контролер
+
+```typescript
+import { Body, Controller, Delete, Get, Param, Post } from '@nestjs/common';
+import { ApiBadRequestResponse, ApiOkResponse, ApiOperation, ApiParam, ApiTags } from '@nestjs/swagger';
+import { ConnectToProjectRequestService } from '../services/connect-to-project-request.service';
+import { CreateConnectToProjectRequestDTO } from '../dtos/create-connect-to-project-request.dto';
+import { ConnectToProjectRequestResponse } from '../../responses/connect-to-project-request.response';
+
+@ApiTags('Connect to Project Request')
+@Controller('/connect-to-project-requests')
+export class ConnectToProjectRequestController {
+    constructor(private readonly connectToProjectRequestService: ConnectToProjectRequestService) {}
+
+    @ApiOperation({
+        summary: 'Get all connect-to-project requests',
+        description: 'Endpoint for getting all connect-to-project requests',
+    })
+    @ApiOkResponse({
+        type: [ConnectToProjectRequestResponse],
+    })
+    @Get()
+    getAll() {
+        return this.connectToProjectRequestService.getAll();
+    }
+
+    @ApiOperation({
+        summary: 'Get connect-to-project request by id',
+        description: 'Endpoint for getting a connect-to-project request by id',
+    })
+    @ApiOkResponse({
+        type: ConnectToProjectRequestResponse,
+    })
+    @ApiBadRequestResponse({
+        description: `\n
+    InvalidEntityIdException:
+      Connect-to-project request with such id not found`,
+    })
+    @ApiParam({
+        name: 'id',
+        description: 'Id of the connect-to-project request to get',
+    })
+    @Get('/:id')
+    get(@Param('id') id: string) {
+        return this.connectToProjectRequestService.getById(id);
+    }
+
+    @ApiOperation({
+        summary: 'Create a new connect-to-project request',
+        description: 'Endpoint for creating a new connect-to-project request',
+    })
+    @ApiOkResponse({
+        type: ConnectToProjectRequestResponse,
+    })
+    @ApiBadRequestResponse({
+        description: `\n
+    InvalidBodyException:
+      User id cannot be empty
+      Project id cannot be empty`,
+    })
+    @Post()
+    create(@Body() body: CreateConnectToProjectRequestDTO) {
+        return this.connectToProjectRequestService.create(body);
+    }
+
+    @ApiOperation({
+        summary: 'Delete connect-to-project request by id',
+        description: 'Endpoint for deleting a connect-to-project request by id',
+    })
+    @ApiOkResponse({
+        description: 'Connect-to-project request successfully deleted',
+    })
+    @ApiBadRequestResponse({
+        description: `\n
+    InvalidEntityIdException:
+      Connect-to-project request with such id not found`,
+    })
+    @ApiParam({
+        name: 'id',
+        description: 'Id of the connect-to-project request to delete',
+    })
+    @Delete('/:id')
+    delete(@Param('id') id: string) {
+        return this.connectToProjectRequestService.deleteById(id);
+    }
+}
+```
+
+#### Сервіс
+
+```typescript
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { PrismaService } from '../../database/prisma.service';
+import { CreateConnectToProjectRequestDTO } from '../dtos/create-connect-to-project-request.dto';
+
+@Injectable()
+export class ConnectToProjectRequestService {
+    constructor(private readonly prisma: PrismaService) {}
+
+    // Отримати всі запити
+    getAll() {
+        return this.prisma.connectToProjectRequest.findMany();
+    }
+
+    // Отримати запит за ID
+    async getById(id: string) {
+        const request = await this.prisma.connectToProjectRequest.findUnique({ where: { id } });
+        if (!request) {
+            throw new NotFoundException(`Connect-to-project request with ID ${id} does not exist`);
+        }
+        return request;
+    }
+
+    // Створити новий запит
+    async create(data: CreateConnectToProjectRequestDTO) {
+        try {
+            return await this.prisma.connectToProjectRequest.create({ data });
+        } catch (error) {
+            if (error.code === 'P2003') { // Foreign key constraint failed
+                throw new BadRequestException('Invalid userId or projectId. Foreign key constraint failed.');
+            }
+            throw new BadRequestException('Error creating the request. Please check the data.');
+        }
+    }
+
+    // Видалити запит за ID
+    async deleteById(id: string) {
+        const request = await this.prisma.connectToProjectRequest.findUnique({ where: { id } });
+        if (!request) {
+            throw new NotFoundException(`Request with ID ${id} does not exist`);
+        }
+
+        return this.prisma.connectToProjectRequest.delete({ where: { id } });
+    }
+}
+```
+
+#### DTO для створення
+
+```typescript
+import { IsNotEmpty, IsString, IsUUID } from 'class-validator';
+import { ApiProperty } from '@nestjs/swagger';
+import { validationOptionsMsg } from '../../utils';
+
+export class CreateConnectToProjectRequestDTO {
+    @ApiProperty({
+        description: 'ID of the user making the request',
+    })
+    @IsNotEmpty(validationOptionsMsg('User ID cannot be empty'))
+    @IsUUID('4', validationOptionsMsg('User ID must be a valid UUID'))
+    userId: string;
+
+    @ApiProperty({
+        description: 'ID of the project to connect to',
+    })
+    @IsNotEmpty(validationOptionsMsg('Project ID cannot be empty'))
+    @IsUUID('4', validationOptionsMsg('Project ID must be a valid UUID'))
+    projectId: string;
+}
+```
+
+#### Модуль
+
+```typescript
+import { Module } from '@nestjs/common';
+import { ConnectToProjectRequestController } from '../api/controllers/connect-to-project-request.controller';
+import { ConnectToProjectRequestService } from '../api/services/connect-to-project-request.service';
+
+@Module({
+    controllers: [ConnectToProjectRequestController],
+    providers: [ConnectToProjectRequestService],
+})
+export class ConnectToProjectRequestModule {}
+```
